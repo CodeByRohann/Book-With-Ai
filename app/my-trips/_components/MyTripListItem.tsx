@@ -1,7 +1,7 @@
 import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Calendar, Clock, Info, Plane, CreditCard, Tag } from 'lucide-react'
-import { Trip } from '../page'
+import { Trip } from '@/utils/custom_types'
 import Link from 'next/link'
 
 type Props = {

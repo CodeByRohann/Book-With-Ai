@@ -9,22 +9,26 @@ interface ThemeProviderProps {
   defaultTheme?: string
   enableSystem?: boolean
   disableTransitionOnChange?: boolean
+  suppressHydrationWarning?: boolean
 }
 
-export function ThemeProvider({ 
-  children, 
+// Author: Sanket
+// Wrapper for next-themes provider with proper hydration handling
+export function ThemeProvider({
+  children,
   attribute = "class",
   defaultTheme = "system",
   enableSystem = true,
   disableTransitionOnChange = true,
-  ...props 
+  ...props
 }: ThemeProviderProps) {
   return (
-    <NextThemesProvider 
+    <NextThemesProvider
       attribute={attribute}
       defaultTheme={defaultTheme}
       enableSystem={enableSystem}
       disableTransitionOnChange={disableTransitionOnChange}
+      suppressHydrationWarning
       {...props}
     >
       {children}

@@ -99,28 +99,41 @@ export function useVoiceConversation(options: UseVoiceConversationOptions = {}):
     if (typeof window !== 'undefined') {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
 
-      if (SpeechRecognition) {
-        try {
-          recognition.current = new SpeechRecognition()
-          recognition.current.continuous = continuous
-          recognition.current.interimResults = interimResults
-          recognition.current.lang = language
-          recognition.current.maxAlternatives = 1
+      // Check for HTTPS (required for Web Speech API in non-localhost)
+      const isSecure = window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-          setState(prev => ({ ...prev, isSupported: true }))
-        } catch (error) {
-          console.warn('Speech recognition initialization failed:', error)
+      if (SpeechRecognition) {
+        if (!isSecure) {
+          console.warn('Voice recognition requires HTTPS or localhost');
           setState(prev => ({
             ...prev,
             isSupported: false,
-            error: 'Voice recognition not available on this device'
+            error: 'Voice features require a secure connection (HTTPS)'
           }))
+        } else {
+          try {
+            recognition.current = new SpeechRecognition()
+            recognition.current.continuous = continuous
+            recognition.current.interimResults = interimResults
+            recognition.current.lang = language
+            recognition.current.maxAlternatives = 1
+
+            setState(prev => ({ ...prev, isSupported: true, error: null }))
+          } catch (error) {
+            console.warn('Speech recognition initialization failed:', error)
+            setState(prev => ({
+              ...prev,
+              isSupported: false,
+              error: 'Voice recognition initialization failed'
+            }))
+          }
         }
+
       } else {
         setState(prev => ({
           ...prev,
           isSupported: false,
-          error: 'Speech recognition not supported in this browser'
+          error: 'Your browser does not support voice recognition. Please try Chrome or Edge.'
         }))
       }
 
@@ -132,7 +145,9 @@ export function useVoiceConversation(options: UseVoiceConversationOptions = {}):
 
     return () => {
       if (recognition.current) {
-        recognition.current.abort()
+        try {
+          recognition.current.abort()
+        } catch (e) { /* ignore cleanup errors */ }
       }
       if (synthesis.current) {
         synthesis.current.cancel()
@@ -175,7 +190,8 @@ export function useVoiceConversation(options: UseVoiceConversationOptions = {}):
         ...prev,
         transcript: currentTranscript,
         confidence: currentConfidence,
-        isProcessing: false
+        isProcessing: false,
+        error: null // clear errors on successful result
       }))
 
       if (finalTranscript && onResult) {
@@ -186,14 +202,16 @@ export function useVoiceConversation(options: UseVoiceConversationOptions = {}):
         clearTimeout(silenceTimeoutRef.current)
       }
 
+      // Auto-stop silence timeout
       silenceTimeoutRef.current = setTimeout(() => {
         if (finalTranscript) {
           stopListening()
         }
-      }, 3000)
+      }, 5000) // Increased silence timeout
     }
 
     const handleStart = () => {
+      console.log('🎤 Voice recognition started');
       setState(prev => ({
         ...prev,
         isListening: true,
@@ -211,6 +229,7 @@ export function useVoiceConversation(options: UseVoiceConversationOptions = {}):
     }
 
     const handleEnd = () => {
+      console.log('🎤 Voice recognition ended');
       setState(prev => ({
         ...prev,
         isListening: false,
@@ -228,43 +247,55 @@ export function useVoiceConversation(options: UseVoiceConversationOptions = {}):
     }
 
     const handleError = (event: any) => {
+      // Only log errors that aren't "no-speech" to avoid console spam during pauses
+      if (event.error !== 'no-speech') {
+        console.error('🎤 Voice recognition error:', event.error);
+      }
+
       let errorMessage = ''
+      let shouldRetry = false;
 
       switch (event.error) {
         case 'no-speech':
-          errorMessage = 'No speech detected. Try speaking closer to your microphone.'
+          // This is normal when user pauses. We shouldn't treat it as a hard error.
+          // Just silently stop or retry if we want continuous feel.
+          // For now, we'll silently stop listening to avoid state conflicts, 
+          // or we could implementing auto-restart here if we want "always listening" mode.
+          // Let's treat it as a "silence" event rather than an error.
+          errorMessage = '' // No visual error
           break
         case 'audio-capture':
-          errorMessage = 'Microphone not available. Please check your device settings.'
+          errorMessage = 'Microphone not found. Please check your settings.'
           break
         case 'not-allowed':
-          errorMessage = 'Microphone access denied. Please enable permissions and reload.'
+        case 'permission-denied':
+          errorMessage = 'Microphone access denied. Please allow permission in browser settings.'
           break
         case 'network':
-          errorMessage = 'Voice recognition temporarily unavailable. You can still type your message.'
+          errorMessage = 'Network error. Voice requires internet connection.'
           break
         case 'service-not-allowed':
-          errorMessage = 'Speech service unavailable. Please use text input instead.'
+          errorMessage = 'Voice service unavailable.'
           break
         case 'aborted':
-          errorMessage = ''
-          break
+          // Ignore aborted errors as they are often user-initiated
+          return;
         default:
-          errorMessage = `Voice input error: ${event.error}. Please use text input.`
+          errorMessage = `Voice Error: ${event.error}`
       }
 
-      setState(prev => ({
-        ...prev,
-        error: errorMessage,
-        isListening: false,
-        isProcessing: false
-      }))
+      // Only update state if there's an actual error to show or if we need to reset state
+      if (errorMessage || event.error === 'no-speech') {
+        setState(prev => ({
+          ...prev,
+          error: errorMessage || null, // Clear error on no-speech
+          isListening: false,
+          isProcessing: false
+        }))
+      }
 
       if (errorMessage && onError) {
-        const silentErrors = ['network', 'service-not-allowed', 'no-speech', 'aborted']
-        if (!silentErrors.includes(event.error)) {
-          onError(errorMessage)
-        }
+        onError(errorMessage)
       }
     }
 
@@ -288,7 +319,7 @@ export function useVoiceConversation(options: UseVoiceConversationOptions = {}):
     if (!recognition.current || !state.isSupported) {
       setState(prev => ({
         ...prev,
-        error: 'Voice recognition not available on this device'
+        error: prev.error || 'Voice recognition not initialized'
       }))
       return
     }
@@ -312,13 +343,15 @@ export function useVoiceConversation(options: UseVoiceConversationOptions = {}):
     }
 
     try {
-      setState(prev => ({ ...prev, error: '' }))
+      setState(prev => ({ ...prev, error: null }))
       recognition.current.start()
     } catch (error: any) {
+      console.error('Failed to start recognition:', error);
       let errorMessage = 'Failed to start voice recognition'
 
       if (error.name === 'InvalidStateError') {
-        errorMessage = 'Voice recognition is already active'
+        // Already started, ignore
+        return;
       } else if (error.name === 'NotAllowedError') {
         errorMessage = 'Microphone permission denied'
       }
@@ -328,11 +361,15 @@ export function useVoiceConversation(options: UseVoiceConversationOptions = {}):
         error: errorMessage
       }))
     }
-  }, [state.isSupported, state.isListening, state.isSpeaking])
+  }, [state.isSupported, state.isListening, state.isSpeaking, state.error])
 
   const stopListening = useCallback(() => {
     if (recognition.current && state.isListening) {
-      recognition.current.stop()
+      try {
+        recognition.current.stop()
+      } catch (e) {
+        console.warn('Error stopping recognition:', e)
+      }
     }
   }, [state.isListening])
 
@@ -364,7 +401,9 @@ export function useVoiceConversation(options: UseVoiceConversationOptions = {}):
 
     return new Promise((resolve, reject) => {
       try {
-        const utterance = new SpeechSynthesisUtterance(text)
+        // Strip out markdown for cleaner speech
+        const cleanText = text.replace(/[*#`_]/g, '');
+        const utterance = new SpeechSynthesisUtterance(cleanText)
 
         // Configure voice settings
         utterance.pitch = voicePitch
@@ -374,6 +413,7 @@ export function useVoiceConversation(options: UseVoiceConversationOptions = {}):
 
         // Get available voices and select best one
         const voices = synthesis.current!.getVoices()
+        // Try to find a Google voice first as they are often higher quality
         const preferredVoice = voices.find(voice =>
           voice.lang.startsWith(language.split('-')[0]) && voice.name.includes('Google')
         ) || voices.find(voice =>
@@ -401,13 +441,14 @@ export function useVoiceConversation(options: UseVoiceConversationOptions = {}):
           if (event.error && event.error !== 'interrupted' && event.error !== 'canceled') {
             console.error('Speech synthesis error:', event.error)
           }
-          reject(event.error || 'Speech synthesis failed')
+          // Don't reject for common interruptions
+          resolve()
         }
 
         synthesis.current!.speak(utterance)
       } catch (error) {
         console.error('Error in text-to-speech:', error)
-        reject(error)
+        resolve() // Don't crash the flow
       }
     })
   }, [state.voiceEnabled, voicePitch, voiceRate, voiceVolume, language, onSpeechStart, onSpeechEnd])

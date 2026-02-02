@@ -8,6 +8,7 @@ import { UserDetailContext } from '@/context/UserDetailContext';
 import { TripContextType, TripDetailContext } from '@/context/TripDetailContext';
 import { TripInfo } from './create-new-trip/_components/ChatBox';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { handleError } from '@/lib/error-handler';
 
 function Provider({
     children,
@@ -18,7 +19,20 @@ function Provider({
     const { isAuthenticated } = useConvexAuth();
     const CreateUser = useMutation(api.user.CreateNewUser)
     const [userDetail, setUserDetail] = useState<any>();
-    const [tripDetailInfo, setTripDetailInfo] = useState<TripInfo | null>(null);
+    const [tripDetailInfo, setTripDetailInfo] = useState<TripInfo | null>(() => {
+        // Author: Sanket - Restore trip data from localStorage on mount
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('draft-trip');
+            if (saved) {
+                try {
+                    return JSON.parse(saved);
+                } catch (e) {
+                    console.error('Failed to parse saved trip:', e);
+                }
+            }
+        }
+        return null;
+    });
 
     const { user } = useUser();
 
@@ -28,6 +42,16 @@ function Provider({
         }
     }, [user, isAuthenticated])
 
+    // Author: Sanket - Save trip data to localStorage whenever it changes
+    useEffect(() => {
+        if (tripDetailInfo) {
+            localStorage.setItem('draft-trip', JSON.stringify(tripDetailInfo));
+        } else {
+            localStorage.removeItem('draft-trip');
+        }
+    }, [tripDetailInfo]);
+
+    // Author: Sanket - User creation with proper error handling
     const CreateNewUser = async () => {
         if (user) {
             try {
@@ -38,8 +62,7 @@ function Provider({
                 });
                 setUserDetail(result);
             } catch (e) {
-                console.error("Error creating/syncing user:", e);
-                // Optionally handle error state
+                handleError(e, 'Failed to sync your account. Please refresh the page.');
             }
         }
     }

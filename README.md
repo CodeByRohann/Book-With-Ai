@@ -128,6 +128,82 @@ npm run dev
 http://localhost:3000
 ```
 
+### Troubleshooting
+
+#### Environment Setup Issues
+
+**Issue: "CONVEX_DEPLOYMENT not found" or missing API keys**
+- Copy `.env.example` to `.env.local`
+- Fill in all required API keys (see `.env.example` for list)
+- Restart the dev server: Stop (Ctrl+C) and run `npm run dev` again
+
+**Issue: Convex connection errors**
+- Ensure you have an active Convex account and project
+- Run `npx convex dev` in a separate terminal
+- Verify `NEXT_PUBLIC_CONVEX_URL` matches your Convex dashboard
+
+**Issue: Clerk authentication not working**
+- Check that both Clerk keys are set in `.env.local`
+- Verify the keys match your Clerk dashboard (Development/Production)
+- Clear browser cookies and try again
+
+#### Build & Runtime Errors
+
+**Issue: Hydration errors in console**
+```bash
+# Clear Next.js cache
+rm -rf .next
+# On Windows:
+rmdir /s .next
+
+# Restart dev server
+npm run dev
+```
+
+**Issue: TypeScript errors during build**
+```bash
+# Ensure all dependencies are installed
+npm install
+
+# Check for missing type definitions
+npm install --save-dev @types/node @types/react @types/react-dom
+```
+
+**Issue: "Module not found" errors**
+- Verify the import path is correct
+- Check if the file exists at the specified location
+- Try restarting your IDE/editor
+
+**Issue: API rate limiting errors**
+- Check your Arcjet configuration
+- Verify your API keys are valid
+- Premium users should be whitelisted in `utils/arcjet.tsx`
+
+#### Development Issues
+
+**Issue: Hot reload not working**
+- Save the file again
+- Restart the dev server
+- Check for syntax errors in your code
+
+**Issue: Slow build times or high memory usage**
+- The project uses `--max-old-space-size=4096` for large bundles
+- Close unnecessary applications
+- Consider upgrading your system RAM
+
+**Issue: Database query errors**
+- Check Convex dashboard for schema mismatches
+- Ensure all required fields are provided
+- Review recent schema changes
+
+#### Getting Help
+
+If you encounter issues not covered here:
+1. Check the [GitHub Issues](https://github.com/georgeadriel07/Book-With-AI/issues)
+2. Review Convex and Clerk documentation
+3. Create a new issue with error logs and steps to reproduce
+
+
 ## 📁 Project Structure
 
 ```

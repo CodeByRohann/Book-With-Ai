@@ -8,9 +8,11 @@ export default defineSchema({
         email: v.string(),
         // Profile Info
         phone: v.optional(v.string()),
+        phoneVerified: v.optional(v.boolean()),
         dob: v.optional(v.string()),
         country: v.optional(v.string()),
         language: v.optional(v.string()),
+        currency: v.optional(v.string()), // USD, INR, EUR, etc.
         location: v.optional(v.string()),
         // Stats
         totalMiles: v.optional(v.number()),
@@ -85,41 +87,30 @@ export default defineSchema({
     }),
 
     // User preferences for personalized recommendations
+    // Author: Sanket - Temporarily using v.any() to fix schema validation issues with old data
+    // TODO: Clean up old data and restore strict typing
     UserPreferences: defineTable({
         userId: v.string(),
-        // Budget
-        preferredBudget: v.object({
-            min: v.optional(v.number()),
-            max: v.optional(v.number()),
-            flight: v.optional(v.number()),
-            hotel: v.optional(v.number()),
-            total: v.optional(v.number()),
-            currency: v.optional(v.string()),
-        }),
-        // Travel Details
-        preferredDestinations: v.array(v.string()),
-        preferredAirlines: v.array(v.string()),
-        preferredHotelCategories: v.array(v.string()), // "Luxury", "Boutique", etc.
-        travelStyle: v.optional(v.object({
-            type: v.string(), // "Relaxed", "Balanced", "Adventurous"
-            pace: v.optional(v.string()),
-        })),
-        travelCompanions: v.optional(v.string()), // "Solo", "Family", "Couple", "Business"
-
-        // In-Flight
-        inFlightPreferences: v.optional(v.object({
-            seat: v.string(), // "Window", "Aisle"
-            meal: v.string(), // "Regular", "Vegetarian", etc.
-            layoverTolerance: v.string(), // "Nonstop", "1 Stop", "Any"
-        })),
-
-        accessibilityNeeds: v.optional(v.string()),
-
-        homeAirport: v.array(v.string()),
-        preferredCabinClass: v.optional(v.string()), // "Economy", "Business"
-
-        lastUpdated: v.string(),
-    }),
+        // Using v.any() temporarily to allow old data formats
+        homeAirports: v.optional(v.any()),
+        preferredAirlines: v.optional(v.any()),
+        preferredCabinClass: v.optional(v.any()),
+        typicalTravelType: v.optional(v.any()),
+        accessibilityNeeds: v.optional(v.any()),
+        seatPreference: v.optional(v.any()),
+        mealPreference: v.optional(v.any()),
+        layoverTolerance: v.optional(v.any()),
+        averageTripBudget: v.optional(v.any()),
+        averageTripLength: v.optional(v.any()),
+        travelStyle: v.optional(v.any()),
+        weights: v.optional(v.any()),
+        preferredBudget: v.optional(v.any()),
+        preferredDestinations: v.optional(v.any()),
+        preferredHotelCategories: v.optional(v.any()),
+        travelCompanions: v.optional(v.any()),
+        inFlightPreferences: v.optional(v.any()),
+        lastUpdated: v.optional(v.any()),
+    }).index("by_user", ["userId"]),
 
     // Smart notifications and alerts
     Notifications: defineTable({
@@ -149,6 +140,7 @@ export default defineSchema({
             date: v.optional(v.string()),
             checkIn: v.optional(v.string()),
             checkOut: v.optional(v.string()),
+            airline: v.optional(v.string()),
         }),
         targetPrice: v.optional(v.number()),
         currentPrice: v.number(),

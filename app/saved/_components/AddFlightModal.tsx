@@ -7,6 +7,7 @@ import { useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { useUser } from '@clerk/nextjs'
 import { Loader2, Plus } from 'lucide-react'
+import { handleError, handleSuccess } from '@/lib/error-handler'
 
 interface AddFlightModalProps {
     children?: React.ReactNode;
@@ -29,6 +30,7 @@ function AddFlightModal({ children }: AddFlightModalProps) {
         price: '',
     });
 
+    // Author: Sanket - Flight saving with proper error handling
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
@@ -65,13 +67,14 @@ function AddFlightModal({ children }: AddFlightModalProps) {
                 isPriceTracked: false,
                 title: `Trip to ${formData.to}`
             });
+            handleSuccess('Flight saved successfully!');
             setOpen(false);
             setFormData({
                 from: '', to: '', airline: '', flightNumber: '',
                 departureDate: '', departureTime: '', arrivalTime: '', price: ''
             });
         } catch (error) {
-            console.error("Failed to save flight:", error);
+            handleError(error, 'Failed to save flight. Please try again.');
         } finally {
             setLoading(false);
         }

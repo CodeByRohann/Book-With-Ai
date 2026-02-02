@@ -12,14 +12,12 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import AppSidebar from '../_components/AppSidebar';
+import { ErrorBoundary } from '@/components/error-boundary';
 
 function CreateNewTrip() {
-    // @ts-ignore
-    const { tripDetailInfo, setTripDetailInfo } = useTripDetail();
-
-    useEffect(() => {
-        setTripDetailInfo(null)
-    }, [])
+    // Author: Sanket - Type-safe context usage without data loss on mount
+    const tripContext = useTripDetail();
+    const { tripDetailInfo, setTripDetailInfo } = tripContext || { tripDetailInfo: null, setTripDetailInfo: () => { } };
 
     return (
         <div className='flex h-full bg-gray-50 dark:bg-gray-900 overflow-hidden'>
@@ -33,9 +31,12 @@ function CreateNewTrip() {
                 <div className='h-full flex flex-col'>
                     {/* Chat Box takes full height */}
                     <div className='flex-1 overflow-hidden'>
-                        <Suspense fallback={<div className="p-4">Loading chat...</div>}>
-                            <ChatBox />
-                        </Suspense>
+                        {/* Author: Sanket - Error boundary protects chat from crashes */}
+                        <ErrorBoundary fallback={<div className="p-8 text-center text-gray-600">Failed to load chat. Please refresh the page.</div>}>
+                            <Suspense fallback={<div className="p-4">Loading chat...</div>}>
+                                <ChatBox />
+                            </Suspense>
+                        </ErrorBoundary>
                     </div>
                 </div>
             </div>

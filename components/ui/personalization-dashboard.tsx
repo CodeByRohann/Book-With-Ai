@@ -111,12 +111,12 @@ export const PersonalizationDashboard: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold capitalize">
-                  {preferences?.travelStyle?.type || 'Balanced'}
+                  {preferences?.travelStyle || 'Balanced'}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {preferences?.travelStyle?.type === 'luxury' && 'Premium experiences and comfort'}
-                  {preferences?.travelStyle?.type === 'budget' && 'Value-focused adventures'}
-                  {preferences?.travelStyle?.type === 'balanced' && 'Perfect mix of comfort and value'}
+                  {preferences?.travelStyle === 'Relaxed' && 'Premium experiences and comfort'}
+                  {preferences?.travelStyle === 'Adventurous' && 'Value-focused adventures'}
+                  {preferences?.travelStyle === 'Balanced' && 'Perfect mix of comfort and value'}
                 </p>
               </CardContent>
             </Card>
@@ -402,7 +402,7 @@ export const PersonalizationDashboard: React.FC = () => {
               <div>
                 <h4 className="font-medium mb-2">Travel Style</h4>
                 <Badge variant="default" className="capitalize">
-                  {preferences?.travelStyle?.type || 'Balanced'}
+                  {preferences?.travelStyle || 'Balanced'}
                 </Badge>
               </div>
 

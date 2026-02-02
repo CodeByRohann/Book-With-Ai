@@ -22,6 +22,7 @@ import { useTripDetail, useUserDetail } from '@/app/provider'
 import { v4 as uuidv4 } from 'uuid'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
+import { useUser } from '@clerk/nextjs'
 
 type Message = {
     role: string
@@ -118,41 +119,41 @@ const ChatBox = React.forwardRef((props: { hideInput?: boolean }, ref) => {
     }));
 
     // Voice Conversation Integration (Speech Recognition + Text-to-Speech)
+    // Voice Conversation Integration (Speech Recognition + Text-to-Speech)
     const [voiceState, voiceControls] = useVoiceConversation({
         continuous: true,
         interimResults: true,
         language: 'en-US',
-        voiceEnabled: false, // User can toggle this
-        voiceRate: 1.1, // Slightly faster than normal
+        voiceEnabled: true, // Enabled by default for ChatGPT-like experience
+        voiceRate: 1.0,
         voicePitch: 1.0,
         onResult: (transcript: string, confidence: number) => {
             // Set the input for any transcript with reasonable length
-            if (transcript.length > 3) {
+            if (transcript.length > 0) {
                 setUserInput(transcript)
+            }
 
-                // Auto-send if confidence is above 60%
-                if (confidence > 0.6) {
-                    // Stop listening immediately
-                    voiceControls.stopListening()
-                    // Use requestAnimationFrame to ensure state is updated before sending
-                    requestAnimationFrame(() => {
-                        triggerSend(transcript)
-                    })
-                }
+            // Auto-send if confidence is high and we have enough content
+            if (confidence > 0.75 && transcript.length > 3) {
+                // Stop listening immediately to prevent duplicate sends
+                voiceControls.stopListening()
+
+                // Use requestAnimationFrame to ensure state is updated before sending
+                requestAnimationFrame(() => {
+                    triggerSend(transcript)
+                })
             }
         },
         onError: (error: string) => {
-            // Only log serious/unexpected errors that need developer attention
-            if (error.includes('Failed to start') || error.includes('Speech recognition error')) {
-                console.error('Voice AI Error:', error)
-            } else if (error.includes('microphone') || error.includes('permissions')) {
-                console.warn('Voice AI permissions:', error)
-            } else {
-                // For expected/handled errors, use info level or no logging
-                console.info('Voice AI info:', error)
+            // Log for debugging
+            if (error) { // Only log actual errors
+                console.debug('Voice feature report:', error);
             }
+
+            // We don't need to alert for every error since the UI component shows them
+            // but we can log them or show specific toasts for critical failures
         },
-        maxDuration: 30000, // 30 seconds max
+        maxDuration: 60000, // 60 seconds max
         autoSend: true
     })
 
@@ -200,7 +201,7 @@ const ChatBox = React.forwardRef((props: { hideInput?: boolean }, ref) => {
             })
 
             console.log('✅ Received response:', result.data);
-            const { resp, ui, trip_plan, intent, location } = result.data || {}
+            const { resp, ui, trip_plan, intent, location, flightDetails } = result.data || {}
 
             // Handle flight search flow
             if (intent === 'flight') {
@@ -212,70 +213,37 @@ const ChatBox = React.forwardRef((props: { hideInput?: boolean }, ref) => {
                         intent
                     }])
 
-                    // Extract flight details from conversation
-                    const fullHistory = [...messages, newMsg];
-                    let from = '', to = '', date = '', budget = 0;
-                    let lastQuestion = null;
+                    // Author: Sanket - Use flightDetails from AI response instead of manual parsing
+                    // This ensures we get returnDate for round-trip flights
+                    const { user } = useUser(); // Get authenticated user
 
-                    for (const msg of fullHistory) {
-                        const content = msg.content.toLowerCase();
-
-                        if (msg.role === 'assistant') {
-                            if (content.match(/flying from|departure city/)) lastQuestion = 'from';
-                            else if (content.match(/fly to|where to|destination/)) lastQuestion = 'to';
-                            else if (content.match(/when|date|traveling/)) lastQuestion = 'date';
-                            else lastQuestion = null;
-                        } else {
-                            // 1. Explicit Regex
-                            const fromMatch = content.match(/(?:from)\s+([a-z\s]+)(?:to|$)/i);
-                            if (fromMatch) {
-                                from = fromMatch[1].trim().replace(/\b(to)\b/gi, '').trim();
-                                lastQuestion = null;
-                            }
-
-                            const toMatch = content.match(/(?:to|fly to|going to)\s+([a-z\s]+)(?:from|$)/i);
-                            if (toMatch) {
-                                to = toMatch[1].trim().replace(/\b(from)\b/gi, '').trim();
-                                lastQuestion = null;
-                            }
-
-                            const dateMatch = content.match(/(\d{4}-\d{2}-\d{2}|\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*|today|tomorrow|next\s+[a-z]+)/i);
-                            if (dateMatch) {
-                                date = dateMatch[0];
-                                lastQuestion = null;
-                            }
-
-                            // Budget Extraction (Cumulative, take latest)
-                            const budgetMatch = content.match(/(?:below|under|less than|budget|price)\s*(?:₹|rs\.?|inr)?\s*(\d+(?:,\d+)*(?:k)?)/i);
-                            if (budgetMatch) {
-                                let valRaw = budgetMatch[1].toLowerCase().replace(/,/g, '');
-                                if (valRaw.includes('k')) valRaw = valRaw.replace('k', '000');
-                                budget = parseInt(valRaw);
-                            }
-
-                            // 2. Contextual Extraction
-                            const cleanContent = content.replace(/\b(to|from|go|fly|flight|please|i|want|will|be)\b/gi, '').trim();
-
-                            if (lastQuestion === 'from' && !from && cleanContent.length > 2) from = cleanContent;
-                            else if (lastQuestion === 'to' && !to && cleanContent.length > 2) to = cleanContent;
-                            else if (lastQuestion === 'date' && !date && cleanContent.length > 2) date = cleanContent;
-                        }
-                    }
-
-                    // Defaults if extraction fails (fallback to Pune -> Delhi tomorrow)
-                    const searchPayload = {
-                        from: from || 'Pune',
-                        to: to || 'Delhi',
-                        date: date || 'tomorrow',
+                    const searchPayload = flightDetails ? {
+                        from: flightDetails.from,
+                        to: flightDetails.to,
+                        date: flightDetails.date,
+                        returnDate: flightDetails.returnDate, // NEW: Include return date for round-trip
+                        passengers: flightDetails.passengers || 1,
+                        userId: user?.emailAddresses[0]?.emailAddress, // Pass user email as ID for personalization
+                        budget: 0 // Budget filtering done in UI
+                    } : {
+                        // Fallback to manual parsing if flightDetails not provided
+                        from: 'Pune',
+                        to: 'Delhi',
+                        date: 'tomorrow',
                         passengers: 1,
-                        budget // Pass budget to API too if needed later, but used in UI filtering for now
+                        userId: user?.emailAddresses[0]?.emailAddress,
+                        budget: 0
                     };
 
                     console.log('✈️ Searching flights:', searchPayload);
 
                     try {
-                        const flightResult = await axios.post('/api/flights/search', searchPayload);
+                        // Author: Sanket - Increased timeout for round-trip flights (dual API calls)
+                        const flightResult = await axios.post('/api/flights/search', searchPayload, {
+                            timeout: 60000 // 60 seconds timeout for dual API calls
+                        });
                         const flights = flightResult.data.flights || [];
+                        const userBudget = flightResult.data.userBudget; // Get budget from API
 
                         setMessages((prev) => {
                             const updated = [...prev];
@@ -288,13 +256,13 @@ const ChatBox = React.forwardRef((props: { hideInput?: boolean }, ref) => {
                                 // @ts-ignore
                                 flights: flights,
                                 route: { from: searchPayload.from, to: searchPayload.to },
-                                budget: budget > 0 ? budget : undefined
+                                budget: userBudget // Use personalized budget from API
                             };
                             return updated;
                         });
 
                         if (voiceState.voiceEnabled) {
-                            voiceControls.speak(`I found ${flights.length} flights for you. ${budget > 0 ? 'Filtering by your budget of ' + budget : ''} The best option starts at ${flights[0]?.price || 'an unknown'} rupees.`).catch(() => { })
+                            voiceControls.speak(`I found ${flights.length} flights for you. The best option starts at ${flights[0]?.price || 'an unknown'} rupees.`).catch(() => { })
                         }
 
                     } catch (error) {
@@ -432,44 +400,83 @@ const ChatBox = React.forwardRef((props: { hideInput?: boolean }, ref) => {
                 return
             }
 
-            // Handle trip planning flow (existing code)
-            if (!isFinal && resp) {
-                setMessages((prev) => [...prev, { role: 'assistant', content: resp, ui }])
+            // Author: Sanket - Robust handling for Trip Plan responses
+            // Sometimes the API might return the plan as raw text in 'resp' if server-side parsing fails
+            // or if the 'isFinal' state closure was stale.
 
-                // Speak the AI response if voice is enabled
-                if (voiceState.voiceEnabled && resp) {
-                    // Clean up the response for better speech output
-                    const cleanedResp = resp
-                        .replace(/\*\*/g, '') // Remove markdown bold
-                        .replace(/\*/g, '') // Remove markdown italic
-                        .replace(/`/g, '') // Remove code markers
-                        .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // Convert links to text
-                        .trim()
+            let finalTripPlan = trip_plan;
+            let finalResp = resp;
 
-                    // Speak the response
-                    voiceControls.speak(cleanedResp).catch(err => {
-                        console.error('Text-to-speech error:', err)
-                    })
+            // Attempt to extract trip_plan from resp if missing
+            if (!finalTripPlan && finalResp && typeof finalResp === 'string' && (finalResp.includes('trip_plan') || finalResp.includes('"trip_plan":'))) {
+                try {
+                    const match = finalResp.match(/\{[\s\S]*\}/);
+                    if (match) {
+                        const parsed = JSON.parse(match[0]);
+                        if (parsed.trip_plan) {
+                            finalTripPlan = parsed.trip_plan;
+                            // Clear resp so we don't show the raw JSON
+                            finalResp = null;
+                        }
+                    }
+                } catch (e) {
+                    console.log('Failed to recover trip plan from response text', e);
                 }
             }
 
-            if (trip_plan) {
+            if (finalTripPlan) {
                 const tripId = uuidv4()
                 await SaveTripDetail({
-                    tripDetail: trip_plan,
+                    tripDetail: finalTripPlan,
                     tripId
                 })
                 setTripId(tripId)
-                setTripDetail(trip_plan)
-                setTripDetailInfo(trip_plan)
+                setTripDetail(finalTripPlan)
+                setTripDetailInfo(finalTripPlan)
                 setIsFinal(false)
 
                 // Learn from this trip for personalization
                 try {
-                    await learnFromNewTrip(trip_plan)
+                    await learnFromNewTrip(finalTripPlan)
                     console.log('✅ Trip data learned for personalization')
                 } catch (error) {
                     console.error('❌ Error learning from trip:', error)
+                }
+
+                // Show success message
+                setMessages((prev) => [...prev, {
+                    role: 'assistant',
+                    content: "I've crafted your perfect itinerary! Check out the details below.",
+                    ui: 'final'
+                }])
+
+            } else if (finalResp) {
+                // Only show text response if we didn't handle a trip plan
+                // AND it doesn't look like raw JSON (which would be ugly)
+                if (!finalResp.trim().startsWith('{') && !finalResp.includes('"trip_plan":')) {
+                    setMessages((prev) => [...prev, { role: 'assistant', content: finalResp, ui }])
+
+                    // Speak the AI response if voice is enabled
+                    if (voiceState.voiceEnabled && finalResp) {
+                        // Clean up the response for better speech output
+                        const cleanedResp = finalResp
+                            .replace(/\*\*/g, '') // Remove markdown bold
+                            .replace(/\*/g, '') // Remove markdown italic
+                            .replace(/`/g, '') // Remove code markers
+                            .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // Convert links to text
+                            .trim()
+
+                        // Speak the response
+                        voiceControls.speak(cleanedResp).catch(err => {
+                            console.error('Text-to-speech error:', err)
+                        })
+                    }
+                } else {
+                    setMessages((prev) => [...prev, {
+                        role: 'assistant',
+                        content: "I'm finalizing your itinerary details... please wait a moment.",
+                        ui: 'loading'
+                    }])
                 }
             }
         } catch (error) {
@@ -671,9 +678,11 @@ const ChatBox = React.forwardRef((props: { hideInput?: boolean }, ref) => {
 
                                 <Textarea
                                     placeholder={
-                                        voiceState.isListening
-                                            ? '🎤 Listening... (Speak now)'
-                                            : 'Message Book With AI...'
+                                        voiceState.error
+                                            ? 'Type your message (Voice unavailable)'
+                                            : voiceState.isListening
+                                                ? '🎤 Speak now...'
+                                                : 'Message Book With AI...'
                                     }
                                     className='flex-1 min-h-[50px] max-h-32 bg-transparent border-none focus-visible:ring-0 shadow-none resize-none text-base text-foreground placeholder:text-muted-foreground py-3.5 px-2'
                                     onChange={(e) => setUserInput(e.target.value)}
@@ -683,6 +692,15 @@ const ChatBox = React.forwardRef((props: { hideInput?: boolean }, ref) => {
                                 />
 
                                 <div className="flex items-center gap-1 p-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className={`rounded-full h-8 w-8 mr-1 transition-all ${voiceState.voiceEnabled ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-400 hover:text-gray-600'}`}
+                                        onClick={voiceControls.toggleVoice}
+                                        title={voiceState.voiceEnabled ? "Mute Voice Response" : "Enable Voice Response"}
+                                    >
+                                        {voiceState.voiceEnabled ? <Volume2 className="h-4 w-4" /> : <Volume2 className="h-4 w-4 opacity-50" />}
+                                    </Button>
                                     <VoiceMicButton
                                         isListening={voiceState.isListening}
                                         isProcessing={voiceState.isProcessing}

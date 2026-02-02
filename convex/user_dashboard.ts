@@ -90,25 +90,22 @@ export const updatePreferences = mutation({
     args: {
         // We will create if not exists
         preferences: v.object({
-            preferredDestinations: v.array(v.string()),
-            preferredAirlines: v.array(v.string()),
-            homeAirport: v.array(v.string()),
+            preferredDestinations: v.optional(v.array(v.string())),
+            preferredAirlines: v.optional(v.array(v.string())),
+            homeAirports: v.optional(v.array(v.string())),
             travelCompanions: v.optional(v.string()),
             preferredCabinClass: v.optional(v.string()),
-            preferredBudget: v.object({
+            preferredBudget: v.optional(v.object({
                 min: v.optional(v.number()),
                 max: v.optional(v.number()),
                 currency: v.optional(v.string()),
-            }),
-            inFlight: v.optional(v.object({
-                seat: v.string(),
-                meal: v.string(),
-                layoverTolerance: v.string(),
             })),
-            travelStyle: v.optional(v.object({
-                type: v.string(),
-                pace: v.optional(v.string()),
-            })),
+            seatPreference: v.optional(v.string()),
+            mealPreference: v.optional(v.string()),
+            layoverTolerance: v.optional(v.string()),
+            travelStyle: v.optional(v.string()),
+            averageTripBudget: v.optional(v.number()),
+            averageTripLength: v.optional(v.string()),
             accessibilityNeeds: v.optional(v.string()),
         })
     },

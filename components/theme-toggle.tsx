@@ -11,22 +11,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
+// Author: Sanket
+// Theme toggle dropdown with light, dark, and system options
 export function ThemeToggle() {
   const { setTheme, theme } = useTheme()
-  const [mounted, setMounted] = React.useState(false)
-
-  React.useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return (
-      <Button variant="outline" size="icon" className="relative">
-        <Sun className="h-[1.2rem] w-[1.2rem] opacity-0" />
-        <span className="sr-only">Toggle theme</span>
-      </Button>
-    )
-  }
 
   return (
     <DropdownMenu>

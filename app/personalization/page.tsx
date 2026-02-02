@@ -1,70 +1,88 @@
+// Author: Sanket - Enhanced personalization page with flight preferences
 'use client'
 
-import { PersonalizationDashboard } from '@/components/ui/personalization-dashboard'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Brain, Sparkles, MapPin, Calendar } from 'lucide-react'
-import Link from 'next/link'
-import { useConvex } from 'convex/react'
+import { useState, useEffect } from 'react'
+import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
-import { useEffect, useState } from 'react'
-
-import { useUserDetail } from '../provider'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { ArrowLeft, Save, Sparkles, CheckCircle2 } from 'lucide-react'
+import Link from 'next/link'
+import { toast } from 'sonner'
+import TravelStyleSection from './_components/TravelStyleSection'
+import PreferencesSection from './_components/PreferencesSection'
+import BudgetSection from './_components/BudgetSection'
 
 export default function PersonalizationPage() {
+  const preferences = useQuery(api.userPreferences.getUserPreferences)
+  const updatePrefs = useMutation(api.userPreferences.updateUserPreferences)
 
-  const { userDetail } = useUserDetail()
-  const convex = useConvex()
-  const [myTrips, setMyTrips] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [formData, setFormData] = useState({
+    travelStyle: 'Balanced',
+    layoverTolerance: '1 Stop',
+    averageTripBudget: 2000,
+  })
 
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  // Load preferences when available
   useEffect(() => {
-    if (userDetail?._id) {
-      GetUserTrips()
+    if (preferences) {
+      setFormData({
+        travelStyle: preferences.travelStyle || 'Balanced',
+        layoverTolerance: preferences.layoverTolerance || '1 Stop',
+        averageTripBudget: preferences.averageTripBudget || 2000,
+      })
     }
-  }, [userDetail])
+  }, [preferences])
 
-  const GetUserTrips = async () => {
+  const handleSave = async () => {
     try {
-      setLoading(true)
-      const result = await convex.query(api.tripDetail.GetUserTrips, {})
-      setMyTrips(result || [])
+      setSaving(true)
+      setSaved(false)
+
+      await updatePrefs(formData)
+
+      setSaved(true)
+      toast.success('Preferences saved successfully!', {
+        description: 'Your flight recommendations will now be personalized based on your preferences.'
+      })
+
+      // Reset saved state after 3 seconds
+      setTimeout(() => setSaved(false), 3000)
     } catch (error) {
-      console.error('Error fetching trips:', error)
+      console.error('Error saving preferences:', error)
+      toast.error('Failed to save preferences', {
+        description: 'Please try again later.'
+      })
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Link href="/my-trips">
+              <Link href="/">
                 <Button variant="ghost" size="sm">
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Trips
+                  Back
                 </Button>
               </Link>
               <div>
                 <h1 className="text-2xl font-bold flex items-center space-x-2">
-                  <Brain className="h-6 w-6 text-primary" />
-                  <span>AI Travel Assistant</span>
+                  <Sparkles className="h-6 w-6 text-indigo-600" />
+                  <span>Travel Preferences</span>
                 </h1>
-                <p className="text-muted-foreground">
-                  Advanced personalization powered by artificial intelligence
+                <p className="text-sm text-muted-foreground">
+                  Customize your flight search experience
                 </p>
               </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Badge variant="secondary" className="flex items-center space-x-1">
-                <Sparkles className="h-3 w-3" />
-                <span>AI Powered</span>
-              </Badge>
             </div>
           </div>
         </div>
@@ -72,171 +90,122 @@ export default function PersonalizationPage() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto">
-          {/* Real Trip Stats */}
-          {!loading && myTrips.length > 0 && (
-            <Card className="mb-8 bg-gradient-to-r from-primary/10 to-purple-500/10 border-primary/20">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Sparkles className="h-5 w-5" />
-                  <span>Your Travel Journey</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div className="flex items-center space-x-3 p-3 bg-background/50 rounded-lg">
-                    <MapPin className="h-8 w-8 text-primary" />
-                    <div>
-                      <div className="text-2xl font-bold">{myTrips.length}</div>
-                      <span className="text-sm text-muted-foreground">Trips Planned</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3 p-3 bg-background/50 rounded-lg">
-                    <Calendar className="h-8 w-8 text-blue-500" />
-                    <div>
-                      <div className="text-2xl font-bold">
-                        {Array.from(new Set(myTrips.map(t => t.tripDetail?.destination))).length}
-                      </div>
-                      <span className="text-sm text-muted-foreground">Destinations</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3 p-3 bg-background/50 rounded-lg">
-                    <Brain className="h-8 w-8 text-purple-500" />
-                    <div>
-                      <div className="text-2xl font-bold">
-                        {myTrips.reduce((acc, t) => acc + (parseInt(t.tripDetail?.duration) || 0), 0)}
-                      </div>
-                      <span className="text-sm text-muted-foreground">Total Days</span>
-                    </div>
-                  </div>
+        <div className="max-w-4xl mx-auto space-y-8">
+          {/* Info Card */}
+          <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 border-indigo-100 dark:border-indigo-900">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-6 h-6 text-white" />
                 </div>
-
-                <p className="text-muted-foreground">
-                  Our AI learns from your {myTrips.length} trip{myTrips.length !== 1 ? 's' : ''} to provide increasingly
-                  accurate recommendations. The more you use Book With Ai, the smarter your suggestions become.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Introduction Card for New Users */}
-          {!loading && myTrips.length === 0 && (
-            <Card className="mb-8 bg-gradient-to-r from-primary/10 to-purple-500/10 border-primary/20">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Sparkles className="h-5 w-5" />
-                  <span>Start Your Personalized Travel Experience</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground mb-4">
-                  Plan your first trip to unlock AI-powered recommendations! Our system learns from your
-                  travel patterns and preferences to provide smarter suggestions with every trip.
-                </p>
-                <div className="flex gap-4">
-                  <Link href="/create-new-trip">
-                    <Button>Plan Your First Trip</Button>
-                  </Link>
-                  <Link href="/my-trips">
-                    <Button variant="outline">View Trip History</Button>
-                  </Link>
+                <div>
+                  <h3 className="font-semibold text-lg mb-2">AI-Powered Flight Recommendations</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Set your travel preferences below to get personalized flight recommendations.
+                    Our AI will analyze flights based on your style, budget, and comfort preferences
+                    to show you the best options for your trip.
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Recent Trips */}
-          {!loading && myTrips.length > 0 && (
-            <Card className="mb-8">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Recent Travel Plans</CardTitle>
-                  <Link href="/my-trips">
-                    <Button variant="outline" size="sm">View All Trips</Button>
-                  </Link>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {myTrips.slice(0, 6).map((trip, index) => (
-                    <Link key={index} href={`/view-trip/${trip.tripId}`}>
-                      <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between mb-2">
-                            <div>
-                              <h3 className="font-semibold text-lg">
-                                {trip.tripDetail?.destination || 'Unknown Destination'}
-                              </h3>
-                              <p className="text-sm text-muted-foreground">
-                                from {trip.tripDetail?.origin || 'N/A'}
-                              </p>
-                            </div>
-                            <Badge variant="secondary">
-                              {trip.tripDetail?.duration || 'N/A'}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>💰 {trip.tripDetail?.budget || 'N/A'}</span>
-                            <span>•</span>
-                            <span>👥 {trip.tripDetail?.group_size || 'N/A'}</span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {/* Travel Style Section */}
+          <Card>
+            <CardContent className="p-6">
+              <TravelStyleSection
+                value={formData.travelStyle}
+                onChange={(style) => setFormData({ ...formData, travelStyle: style })}
+              />
+            </CardContent>
+          </Card>
 
-          {/* Personalization Dashboard */}
-          <PersonalizationDashboard />
+          {/* Preferences Section */}
+          <Card>
+            <CardContent className="p-6">
+              <PreferencesSection
+                layoverTolerance={formData.layoverTolerance}
+                onChange={(prefs) => setFormData({ ...formData, ...prefs })}
+              />
+            </CardContent>
+          </Card>
 
-          {/* Feature Highlights */}
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">🎯 Smart Suggestions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  AI-powered destination and budget recommendations based on your travel history and preferences.
-                </p>
-              </CardContent>
-            </Card>
+          {/* Budget Section */}
+          <Card>
+            <CardContent className="p-6">
+              <BudgetSection
+                budget={formData.averageTripBudget}
+                onChange={(budget) => setFormData({ ...formData, averageTripBudget: budget })}
+              />
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">📊 Travel Patterns</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Detailed analysis of your travel behavior, seasonal preferences, and booking patterns.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">🔔 Smart Alerts</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Receive notifications about price drops, trip reminders, and personalized travel deals.
-                </p>
-              </CardContent>
-            </Card>
+          {/* Save Button */}
+          <div className="flex justify-end gap-3">
+            <Link href="/">
+              <Button variant="outline">Cancel</Button>
+            </Link>
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className="min-w-[120px]"
+            >
+              {saving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Saving...
+                </>
+              ) : saved ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Saved!
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Preferences
+                </>
+              )}
+            </Button>
           </div>
 
-          {/* Privacy Notice */}
-          <Card className="mt-8 border-muted">
-            <CardContent className="py-6">
-              <div className="text-center space-y-2">
-                <h3 className="font-medium">🔒 Your Privacy is Protected</h3>
-                <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
-                  All personalization data is encrypted and stored securely. We never share your travel patterns
-                  or personal information with third parties. You can delete your data at any time.
-                </p>
+          {/* How It Works */}
+          <Card className="border-muted">
+            <CardContent className="p-6">
+              <h3 className="font-semibold mb-4">How AI Personalization Works</h3>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <div className="flex gap-3">
+                  <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center flex-shrink-0 text-indigo-600 dark:text-indigo-400 font-semibold">
+                    1
+                  </div>
+                  <p>
+                    <strong className="text-foreground">Travel Style</strong> determines how we balance price, speed, and comfort in our recommendations.
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center flex-shrink-0 text-indigo-600 dark:text-indigo-400 font-semibold">
+                    2
+                  </div>
+                  <p>
+                    <strong className="text-foreground">Layover Tolerance</strong> filters flights based on your connection preferences.
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center flex-shrink-0 text-indigo-600 dark:text-indigo-400 font-semibold">
+                    3
+                  </div>
+                  <p>
+                    <strong className="text-foreground">Budget</strong> helps us highlight flights within your typical spending range.
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center flex-shrink-0 text-indigo-600 dark:text-indigo-400 font-semibold">
+                    4
+                  </div>
+                  <p>
+                    <strong className="text-foreground">GPT-4o mini</strong> analyzes each flight and generates personalized reasons why it's a good match for you.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>

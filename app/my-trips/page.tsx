@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react'
 import { useUserDetail } from '../provider';
 import { ArrowBigRightIcon, Plane } from 'lucide-react';
 import FlightBookingCard from './_components/FlightBookingCard';
+import { Skeleton } from '@/components/ui/skeleton';
 
 function MyTrips() {
     const { userDetail } = useUserDetail();
@@ -43,7 +44,28 @@ function MyTrips() {
                 </div>
             </div>
 
-            {flightBookings.length === 0 ? (
+            {/* Author: Sanket - Loading state while fetching bookings */}
+            {flightBookings === undefined ? (
+                <div className="space-y-6 mt-6">
+                    {[...Array(3)].map((_, i) => (
+                        <div key={i} className="border rounded-2xl p-6 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <Skeleton className="h-6 w-32" />
+                                <Skeleton className="h-5 w-24" />
+                            </div>
+                            <div className="flex items-center gap-8">
+                                <Skeleton className="h-12 w-24" />
+                                <Skeleton className="h-px flex-1" />
+                                <Skeleton className="h-12 w-24" />
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <Skeleton className="h-4 w-40" />
+                                <Skeleton className="h-10 w-32" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : flightBookings.length === 0 ? (
                 <div className='p-12 border border-dashed border-gray-300 dark:border-gray-700 rounded-3xl flex flex-col items-center justify-center gap-6 mt-6 bg-gray-50/50 dark:bg-card/50'>
                     <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
                         <ArrowBigRightIcon className="w-10 h-10 text-blue-600 dark:text-blue-400 opacity-50" />

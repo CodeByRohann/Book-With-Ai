@@ -5,6 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { MapPin, Plane, Users, Luggage, Search, Loader2, IndianRupee } from 'lucide-react';
+import { useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { useUser } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
+import { handleError, handleSuccess } from '@/lib/error-handler';
 
 interface Flight {
   id: string;
@@ -35,15 +40,20 @@ interface FlightSearchData {
 }
 
 export default function FlightSearchResults() {
+  const { user } = useUser();
+  const router = useRouter();
+  const createBooking = useMutation(api.bookings.createFlightBooking);
+
   const [searchData, setSearchData] = useState({
     from: 'Pune',
-    to: 'Dubai', 
+    to: 'Dubai',
     date: new Date().toISOString().split('T')[0],
     passengers: 1
   });
   const [flights, setFlights] = useState<Flight[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [bookingInProgress, setBookingInProgress] = useState<string | null>(null);
 
   const searchFlights = async () => {
     if (!searchData.from || !searchData.to || !searchData.date) {
@@ -62,7 +72,7 @@ export default function FlightSearchResults() {
       });
 
       const data: FlightSearchData = await response.json();
-      
+
       if (data.success) {
         setFlights(data.flights);
         setHasSearched(true);
@@ -78,9 +88,45 @@ export default function FlightSearchResults() {
     }
   };
 
+  // Author: Sanket - Integrated flight booking with Convex
   const bookFlight = async (flight: Flight) => {
-    alert(`Booking ${flight.airline} ${flight.flightNumber} for ₹${flight.price.toLocaleString()}`);
-    // TODO: Implement real booking flow with Convex
+    if (!user) {
+      handleError(new Error('Not authenticated'), 'Please sign in to book flights');
+      router.push('/sign-in');
+      return;
+    }
+
+    setBookingInProgress(flight.id);
+    try {
+      const bookingId = await createBooking({
+        userId: user.id,
+        bookingId: `BK${Date.now()}`,
+        flightId: flight.id,
+        airline: flight.airline,
+        flightNumber: flight.flightNumber,
+        from: flight.from,
+        to: flight.to,
+        departure: flight.departure,
+        arrival: flight.arrival,
+        date: searchData.date,
+        passengers: searchData.passengers,
+        totalPrice: flight.price * searchData.passengers,
+        currency: flight.currency,
+        status: 'pending',
+        bookingDate: new Date().toISOString(),
+        passengerDetails: {
+          adults: searchData.passengers,
+          // TODO: Collect detailed passenger info in a modal
+        }
+      });
+
+      handleSuccess('Flight booking created successfully!');
+      router.push(`/bookings/${bookingId}`);
+    } catch (error) {
+      handleError(error, 'Failed to book flight. Please try again.');
+    } finally {
+      setBookingInProgress(null);
+    }
   };
 
   return (
@@ -100,7 +146,7 @@ export default function FlightSearchResults() {
               <Input
                 placeholder="Departure city"
                 value={searchData.from}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchData({...searchData, from: e.target.value})}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchData({ ...searchData, from: e.target.value })}
               />
             </div>
             <div>
@@ -108,7 +154,7 @@ export default function FlightSearchResults() {
               <Input
                 placeholder="Destination city"
                 value={searchData.to}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchData({...searchData, to: e.target.value})}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchData({ ...searchData, to: e.target.value })}
               />
             </div>
             <div>
@@ -116,7 +162,7 @@ export default function FlightSearchResults() {
               <Input
                 type="date"
                 value={searchData.date}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchData({...searchData, date: e.target.value})}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchData({ ...searchData, date: e.target.value })}
               />
             </div>
             <div>
@@ -126,11 +172,11 @@ export default function FlightSearchResults() {
                 min="1"
                 max="9"
                 value={searchData.passengers}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchData({...searchData, passengers: parseInt(e.target.value)})}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchData({ ...searchData, passengers: parseInt(e.target.value) })}
               />
             </div>
-            <Button 
-              onClick={searchFlights} 
+            <Button
+              onClick={searchFlights}
               disabled={loading}
               className="w-full"
             >
@@ -247,12 +293,20 @@ export default function FlightSearchResults() {
                           <div className="text-xs text-muted-foreground">
                             {flight.cancellation}
                           </div>
-                          <Button 
+                          <Button
                             onClick={() => bookFlight(flight)}
                             className="w-full"
                             size="lg"
+                            disabled={bookingInProgress === flight.id}
                           >
-                            Book Now
+                            {bookingInProgress === flight.id ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Booking...
+                              </>
+                            ) : (
+                              'Book Now'
+                            )}
                           </Button>
                         </div>
                       </div>

@@ -138,55 +138,196 @@ export interface Flight {
   baggage?: string;
   meals?: boolean;
   cancellation?: string;
+  tripType?: 'one-way' | 'round-trip';
+  departureDate?: string;
+  returnDate?: string;
+  returnFlight?: {
+    departure: string;
+    arrival: string;
+    duration: string;
+    airline: string;
+    stops: number;
+  };
 }
 
 // Search for flights using SerpAPI Google Flights
-export async function searchFlights(fromCode: string, toCode: string, date: string, passengers: number = 1): Promise<Flight[]> {
+// Author: Sanket - Enhanced to support round-trip flights
+export async function searchFlights(
+  fromCode: string,
+  toCode: string,
+  date: string,
+  passengers: number = 1,
+  returnDate?: string
+): Promise<Flight[]> {
   try {
-    console.log(`✈️ Searching flights: ${fromCode} -> ${toCode} on ${date}`);
-    const response = await getJson({
-      engine: "google_flights",
-      departure_id: fromCode,
-      arrival_id: toCode,
-      outbound_date: date,
-      currency: "INR",
-      hl: "en",
-      adults: passengers,
-      api_key: SERPAPI_KEY,
-      type: "2" // One-way trip
-    });
+    // Author: Sanket - Enhanced to handle round-trip flights with dual API calls
+    // SerpAPI only returns one leg even for round-trip, so we make two separate calls
 
-    if (!response.best_flights && !response.other_flights) {
-      console.warn('⚠️ No flights found in SerpAPI response');
-      return [];
+    if (returnDate) {
+      console.log(`✈️ Searching round-trip flights: ${fromCode} -> ${toCode} on ${date} returning ${returnDate}`);
+      console.log(`🔄 Making dual API calls...`);
+
+      // Make two separate API calls: outbound and return
+      const [outboundFlights, returnFlights] = await Promise.all([
+        searchOneWayFlights(fromCode, toCode, date, passengers),
+        searchOneWayFlights(toCode, fromCode, returnDate, passengers) // Reverse direction
+      ]);
+
+      console.log(`✅ Outbound flights: ${outboundFlights.length}, Return flights: ${returnFlights.length}`);
+
+      // Combine outbound and return flights into round-trip options
+      const combined = combineRoundTripFlights(outboundFlights, returnFlights, date, returnDate);
+      console.log(`✅ Combined ${combined.length} round-trip flight options`);
+      return combined;
+    } else {
+      console.log(`✈️ Searching one-way flights: ${fromCode} -> ${toCode} on ${date}`);
+      return searchOneWayFlights(fromCode, toCode, date, passengers);
     }
-
-    const rawFlights = [...(response.best_flights || []), ...(response.other_flights || [])];
-
-    return rawFlights.slice(0, 15).map((f: any, index: number) => {
-      const leg = f.flights[0]; // Assuming first leg for now
-      return {
-        id: `FL-${index}-${fromCode}-${toCode}`,
-        airline: leg.airline || 'Unknown Airline',
-        flightNumber: leg.flight_number || '',
-        from: leg.departure_airport?.name || fromCode,
-        to: leg.arrival_airport?.name || toCode,
-        departure: leg.departure_airport?.time?.split(' ')[1] || '00:00', // Extract HH:MM
-        arrival: leg.arrival_airport?.time?.split(' ')[1] || '00:00',
-        duration: `${Math.floor(f.total_duration / 60)}h ${f.total_duration % 60}m`,
-        price: f.price || 0, // SerpAPI returns numerical price often, or need parsing if string
-        currency: 'INR',
-        logo: leg.airline_logo,
-        stops: f.layovers ? f.layovers.length : 0,
-        aircraft: leg.airplane,
-        // Defaults for info not always in basic search
-        baggage: 'Check with airline',
-        cancellation: 'Check rules'
-      };
-    });
-
   } catch (error) {
     console.error('❌ SerpAPI Flight Search Error:', error);
     return [];
   }
+}
+
+/**
+ * Search for one-way flights using SerpAPI
+ * Author: Sanket - Extracted from main searchFlights function
+ */
+async function searchOneWayFlights(
+  fromCode: string,
+  toCode: string,
+  date: string,
+  passengers: number
+): Promise<Flight[]> {
+  console.log(`📡 Calling SerpAPI: ${fromCode} -> ${toCode} on ${date}`);
+
+  const response = await getJson({
+    engine: "google_flights",
+    departure_id: fromCode,
+    arrival_id: toCode,
+    outbound_date: date,
+    currency: "INR",
+    hl: "en",
+    adults: passengers,
+    api_key: SERPAPI_KEY,
+    type: "2" // Always one-way for individual legs
+  });
+
+  if (!response.best_flights && !response.other_flights) {
+    console.warn(`⚠️ No flights found for ${fromCode} -> ${toCode} on ${date}`);
+    return [];
+  }
+
+  const rawFlights = [...(response.best_flights || []), ...(response.other_flights || [])];
+  console.log(`✅ SerpAPI returned ${rawFlights.length} flights for ${fromCode} -> ${toCode}`);
+
+  return rawFlights.slice(0, 15).map((f: any, index: number) => {
+    const leg = f.flights[0];
+    return {
+      id: `FL-${index}-${fromCode}-${toCode}-${date}`,
+      airline: leg.airline || 'Unknown Airline',
+      flightNumber: leg.flight_number || '',
+      from: leg.departure_airport?.name || fromCode,
+      to: leg.arrival_airport?.name || toCode,
+      departure: leg.departure_airport?.time?.split(' ')[1] || '00:00',
+      arrival: leg.arrival_airport?.time?.split(' ')[1] || '00:00',
+      duration: `${Math.floor(f.total_duration / 60)}h ${f.total_duration % 60}m`,
+      price: f.price || 0,
+      currency: 'INR',
+      logo: leg.airline_logo,
+      stops: f.layovers ? f.layovers.length : 0,
+      aircraft: leg.airplane,
+      baggage: 'Check with airline',
+      cancellation: 'Check rules',
+      tripType: 'one-way',
+      departureDate: date,
+    };
+  });
+}
+
+/**
+ * Combine outbound and return flights into round-trip options
+ * Author: Sanket - Creates round-trip flight combinations
+ */
+function combineRoundTripFlights(
+  outboundFlights: Flight[],
+  returnFlights: Flight[],
+  outboundDate: string,
+  returnDate: string
+): Flight[] {
+  const roundTripFlights: Flight[] = [];
+
+  // Strategy: Combine flights from the same airline first, then mix
+  // Take top 5 outbound and top 5 return to create combinations
+  const topOutbound = outboundFlights.slice(0, 5);
+  const topReturn = returnFlights.slice(0, 5);
+
+  let combinationIndex = 0;
+
+  // First: Same airline combinations (preferred)
+  for (const outbound of topOutbound) {
+    const matchingReturn = topReturn.find(r => r.airline === outbound.airline);
+    if (matchingReturn) {
+      roundTripFlights.push({
+        ...outbound,
+        id: `RT-${combinationIndex++}-${outbound.airline}`,
+        tripType: 'round-trip',
+        price: outbound.price + matchingReturn.price, // Combined price
+        departureDate: outboundDate,
+        returnDate: returnDate,
+        returnFlight: {
+          departure: matchingReturn.departure,
+          arrival: matchingReturn.arrival,
+          duration: matchingReturn.duration,
+          airline: matchingReturn.airline,
+          stops: matchingReturn.stops,
+        }
+      });
+    }
+  }
+
+  // Second: Mixed airline combinations (if we have less than 10 options)
+  if (roundTripFlights.length < 10) {
+    for (const outbound of topOutbound) {
+      for (const returnFlight of topReturn) {
+        // Skip if already added (same airline combo)
+        if (outbound.airline === returnFlight.airline) continue;
+
+        // Skip if we already have enough options
+        if (roundTripFlights.length >= 10) break;
+
+        roundTripFlights.push({
+          ...outbound,
+          id: `RT-${combinationIndex++}-${outbound.airline}-${returnFlight.airline}`,
+          tripType: 'round-trip',
+          price: outbound.price + returnFlight.price,
+          departureDate: outboundDate,
+          returnDate: returnDate,
+          returnFlight: {
+            departure: returnFlight.departure,
+            arrival: returnFlight.arrival,
+            duration: returnFlight.duration,
+            airline: returnFlight.airline,
+            stops: returnFlight.stops,
+          }
+        });
+      }
+    }
+  }
+
+  console.log(`✅ Combined ${roundTripFlights.length} round-trip flight options`);
+
+  // DEBUG: Log first flight to verify returnFlight structure
+  if (roundTripFlights.length > 0) {
+    console.log('🔍 DEBUG - First round-trip flight:', JSON.stringify({
+      id: roundTripFlights[0].id,
+      tripType: roundTripFlights[0].tripType,
+      airline: roundTripFlights[0].airline,
+      price: roundTripFlights[0].price,
+      hasReturnFlight: !!roundTripFlights[0].returnFlight,
+      returnFlight: roundTripFlights[0].returnFlight
+    }, null, 2));
+  }
+
+  return roundTripFlights;
 }

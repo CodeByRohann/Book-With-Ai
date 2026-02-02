@@ -5,6 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { MapPin, Hotel, Users, Search, Loader2, IndianRupee, Star, Wifi, Car, Coffee } from 'lucide-react';
+import { useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { useUser } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
+import { handleError, handleSuccess } from '@/lib/error-handler';
 
 interface Hotel {
   id: string;
@@ -38,6 +43,10 @@ interface HotelSearchData {
 }
 
 export default function RealTimeHotelSearch() {
+  const { user } = useUser();
+  const router = useRouter();
+  const createHotelBooking = useMutation(api.bookings.createHotelBooking);
+
   const [searchData, setSearchData] = useState({
     city: 'Dubai',
     checkIn: new Date().toISOString().split('T')[0],
@@ -48,6 +57,7 @@ export default function RealTimeHotelSearch() {
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [bookingInProgress, setBookingInProgress] = useState<string | null>(null);
 
   const searchHotels = async () => {
     if (!searchData.city || !searchData.checkIn || !searchData.checkOut) {
@@ -117,9 +127,45 @@ export default function RealTimeHotelSearch() {
     }
   };
 
+  // Author: Sanket - Integrated hotel booking with Convex
   const bookHotel = async (hotel: Hotel) => {
-    alert(`Booking ${hotel.name} for ₹${hotel.totalPrice.toLocaleString()} total`);
-    // TODO: Implement real booking flow with Convex
+    if (!user) {
+      handleError(new Error('Not authenticated'), 'Please sign in to book hotels');
+      router.push('/sign-in');
+      return;
+    }
+
+    setBookingInProgress(hotel.id);
+    try {
+      const nights = Math.ceil((new Date(searchData.checkOut).getTime() - new Date(searchData.checkIn).getTime()) / (1000 * 60 * 60 * 24));
+
+      const bookingId = await createHotelBooking({
+        userId: user.id,
+        bookingId: `HB${Date.now()}`,
+        hotelId: hotel.id,
+        hotelName: hotel.name,
+        city: searchData.city,
+        checkIn: searchData.checkIn,
+        checkOut: searchData.checkOut,
+        nights: nights > 0 ? nights : 1,
+        guests: searchData.guests,
+        roomType: hotel.roomType,
+        totalPrice: hotel.totalPrice,
+        currency: hotel.currency,
+        status: 'pending',
+        bookingDate: new Date().toISOString(),
+        guestDetails: {
+          guests: searchData.guests,
+        }
+      });
+
+      handleSuccess('Hotel booked successfully!');
+      router.push(`/bookings/hotel/${bookingId}`);
+    } catch (error) {
+      handleError(error, 'Failed to book hotel. Please try again.');
+    } finally {
+      setBookingInProgress(null);
+    }
   };
 
   const renderStars = (rating: number) => {
@@ -336,8 +382,16 @@ export default function RealTimeHotelSearch() {
                             onClick={() => bookHotel(hotel)}
                             className="w-full"
                             size="lg"
+                            disabled={bookingInProgress === hotel.id}
                           >
-                            Book Now
+                            {bookingInProgress === hotel.id ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Booking...
+                              </>
+                            ) : (
+                              'Book Now'
+                            )}
                           </Button>
                         </div>
                       </div>

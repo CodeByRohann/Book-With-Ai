@@ -8,6 +8,7 @@ import { api } from '@/convex/_generated/api'
 import { useUser } from '@clerk/nextjs'
 import { Loader2, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { handleError, handleSuccess } from '@/lib/error-handler'
 
 interface CreateGroupTripModalProps {
     children?: React.ReactNode;
@@ -57,7 +58,7 @@ function CreateGroupTripModal({ children }: CreateGroupTripModalProps) {
             setFormData({ name: '', description: '', city: '', country: '', startDate: '', endDate: '', budgetTotal: '' });
             router.push(`/group-planning/${tripId}`);
         } catch (error) {
-            console.error("Failed to create group trip:", error);
+            handleError(error, 'Failed to create group trip. Please try again.');
         } finally {
             setLoading(false);
         }

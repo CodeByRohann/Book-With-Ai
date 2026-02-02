@@ -14,7 +14,7 @@ export interface TravelPreferences {
   preferredDestinations: string[];
   preferredAirlines: string[];
   preferredHotelCategories: string[];
-  travelStyle: { type: string; pace?: string };
+  travelStyle: string; // "Relaxed" | "Balanced" | "Adventurous"
 }
 
 export interface TravelPatterns {
@@ -124,7 +124,7 @@ export const usePersonalization = () => {
     try {
       await updatePreferences({
         ...newPreferences,
-        travelStyle: newPreferences.travelStyle?.type
+        travelStyle: newPreferences.travelStyle
       });
     } catch (error) {
       console.error('Error updating preferences:', error);
@@ -138,9 +138,9 @@ export const usePersonalization = () => {
     const suggestions = [...(preferences.preferredDestinations || [])];
 
     // Add popular destinations based on travel style
-    if (preferences.travelStyle?.type === 'luxury') {
+    if (preferences.travelStyle === 'Relaxed') {
       suggestions.push('Dubai, UAE', 'Maldives', 'Swiss Alps', 'Monaco');
-    } else if (preferences.travelStyle?.type === 'budget') {
+    } else if (preferences.travelStyle === 'Adventurous') {
       suggestions.push('Thailand', 'Portugal', 'Vietnam', 'Czech Republic');
     } else {
       suggestions.push('Paris, France', 'Tokyo, Japan', 'New York, USA', 'Barcelona, Spain');
@@ -170,9 +170,9 @@ export const usePersonalization = () => {
     }
 
     // Adjust based on travel style
-    if (preferences?.travelStyle?.type === 'luxury') {
+    if (preferences?.travelStyle === 'Relaxed') {
       multiplier *= 2;
-    } else if (preferences?.travelStyle?.type === 'budget') {
+    } else if (preferences?.travelStyle === 'Adventurous') {
       multiplier *= 0.5;
     }
 
@@ -203,8 +203,8 @@ export const usePersonalization = () => {
 
     // Preference completeness (30%)
     let prefScore = 0;
-    if (preferences.preferredDestinations?.length > 0) prefScore += 10;
-    if (preferences.travelStyle && preferences.travelStyle.type !== 'balanced') prefScore += 10;
+    if (preferences.preferredDestinations && preferences.preferredDestinations.length > 0) prefScore += 10;
+    if (preferences.travelStyle && preferences.travelStyle !== 'Balanced') prefScore += 10;
     if (preferences.preferredBudget?.total && preferences.preferredBudget.total > 0) prefScore += 10;
     score += prefScore;
 

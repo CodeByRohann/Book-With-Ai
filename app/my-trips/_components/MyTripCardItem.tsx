@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useState } from 'react'
-import { Trip } from '../page'
+import { Trip } from '@/utils/custom_types'
 import Image from 'next/image'
 import { ArrowBigRightIcon } from 'lucide-react'
 import axios from 'axios'

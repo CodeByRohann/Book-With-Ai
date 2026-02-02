@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import HotelCardItem from './HotelCardItem';
 import PlaceCardItem from './PlaceCardItem';
-import { Trip } from '@/app/my-trips/page';
-import { TripInfo } from './ChatBox';
+import { Trip } from '@/utils/custom_types';
+import { TripInfo, Hotel, Itinerary as ItineraryType, Activity } from './ChatBox';
 
 type Props = {
     trip?: Trip
@@ -32,7 +32,7 @@ function Itinerary({ trip }: Props) {
                     <h2 className='font-bold text-2xl text-gray-900 dark:text-white'>Hotel Recommendations</h2>
                 </div>
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-                    {tripData?.hotels?.map((hotel, index) => (
+                    {tripData?.hotels?.map((hotel: Hotel, index: number) => (
                         <HotelCardItem key={`hotel-${index}`} hotel={hotel} />
                     ))}
                 </div>
@@ -48,7 +48,7 @@ function Itinerary({ trip }: Props) {
                 </div>
 
                 <div className="relative border-l-2 border-dashed border-gray-200 dark:border-gray-800 ml-5 space-y-12 pb-10">
-                    {tripData?.itinerary?.map((dayData, dayIndex) => (
+                    {tripData?.itinerary?.map((dayData: ItineraryType, dayIndex: number) => (
                         <div key={`day-${dayIndex}`} className="relative pl-10">
                             {/* Day Marker */}
                             <div className="absolute -left-[17px] top-0 w-8 h-8 rounded-full bg-blue-600 border-4 border-white dark:border-gray-900 flex items-center justify-center shadow-md z-10">
@@ -70,7 +70,7 @@ function Itinerary({ trip }: Props) {
 
                             {/* Activities Grid */}
                             <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-                                {dayData?.activities?.map((activity, index) => (
+                                {dayData?.activities?.map((activity: Activity, index: number) => (
                                     <PlaceCardItem key={`place-${dayIndex}-${index}`} activity={activity} />
                                 ))}
                             </div>

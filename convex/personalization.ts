@@ -1,7 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
-// Create or update user preferences
+// Author: Sanket - Updated to match new UserPreferences schema
 export const updateUserPreferences = mutation({
   args: {
     preferredBudget: v.optional(v.object({
@@ -22,7 +22,7 @@ export const updateUserPreferences = mutation({
 
     const existing = await ctx.db
       .query("UserPreferences")
-      .filter((q) => q.eq(q.field("userId"), userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .first();
 
     const updateData = {
@@ -31,8 +31,8 @@ export const updateUserPreferences = mutation({
       preferredDestinations: args.preferredDestinations || [],
       preferredAirlines: args.preferredAirlines || [],
       preferredHotelCategories: args.preferredHotelCategories || [],
-      homeAirport: [],
-      travelStyle: { type: args.travelStyle ?? "balanced" },
+      homeAirports: [],
+      travelStyle: args.travelStyle ?? "Balanced",
       lastUpdated: new Date().toISOString(),
     };
 
@@ -69,8 +69,8 @@ export const getUserPreferences = query({
         preferredDestinations: [],
         preferredAirlines: [],
         preferredHotelCategories: [],
-        homeAirport: [],
-        travelStyle: { type: "balanced" },
+        homeAirports: [],
+        travelStyle: "Balanced",
         lastUpdated: new Date().toISOString(),
       };
     }
@@ -107,16 +107,16 @@ export const learnFromTrip = mutation({
         preferredDestinations: [args.tripData.destination].filter(Boolean),
         preferredAirlines: [],
         preferredHotelCategories: [],
-        homeAirport: [],
-        travelStyle: args.tripData.budget?.toLowerCase().includes('luxury') ? { type: 'luxury' } :
-          args.tripData.budget?.toLowerCase().includes('cheap') ? { type: 'budget' } : { type: 'balanced' },
+        homeAirports: [],
+        travelStyle: args.tripData.budget?.toLowerCase().includes('luxury') ? 'Relaxed' :
+          args.tripData.budget?.toLowerCase().includes('cheap') ? 'Adventurous' : 'Balanced',
         lastUpdated: new Date().toISOString(),
       };
 
       await ctx.db.insert("UserPreferences", newPreferences);
     } else {
       // Update existing preferences
-      const updatedDestinations = [...preferences.preferredDestinations];
+      const updatedDestinations = [...(preferences.preferredDestinations || [])];
       if (args.tripData.destination && !updatedDestinations.includes(args.tripData.destination)) {
         updatedDestinations.push(args.tripData.destination);
         // Keep only last 10 destinations
@@ -126,11 +126,11 @@ export const learnFromTrip = mutation({
       }
 
       // Update travel style based on budget choices
-      let travelStyle = preferences.travelStyle || { type: 'balanced' };
+      let travelStyle = preferences.travelStyle || 'Balanced';
       if (args.tripData.budget?.toLowerCase().includes('luxury')) {
-        travelStyle = { type: 'luxury' };
+        travelStyle = 'Relaxed';
       } else if (args.tripData.budget?.toLowerCase().includes('cheap')) {
-        travelStyle = { type: 'budget' };
+        travelStyle = 'Adventurous';
       }
 
       await ctx.db.patch(preferences._id, {
@@ -271,7 +271,7 @@ export const recordUserInteraction = mutation({
         .first();
 
       if (preferences) {
-        const updatedDestinations = [...preferences.preferredDestinations];
+        const updatedDestinations = [...(preferences.preferredDestinations || [])];
         if (!updatedDestinations.includes(args.data.destination)) {
           updatedDestinations.unshift(args.data.destination);
           // Keep top 10
@@ -300,12 +300,12 @@ function generateDestinationRecommendations(preferences: any, history: any[], tr
   ];
 
   // Customize based on preferences
-  if (preferences?.travelStyle?.type === 'luxury') {
+  if (preferences?.travelStyle === 'Relaxed') {
     destinations.unshift(
       { name: "Maldives", reason: "Ultimate luxury beach resort destination", match: 95 },
       { name: "Swiss Alps", reason: "Premium mountain luxury experience", match: 90 }
     );
-  } else if (preferences?.travelStyle?.type === 'budget') {
+  } else if (preferences?.travelStyle === 'Adventurous') {
     destinations.unshift(
       { name: "Thailand", reason: "Amazing value for money destination", match: 92 },
       { name: "Portugal", reason: "European charm at affordable prices", match: 88 }
@@ -324,9 +324,9 @@ function generateBudgetRecommendations(preferences: any, history: any[], trips: 
   ];
 
   // Recommend based on travel style
-  if (preferences?.travelStyle?.type === 'budget') {
+  if (preferences?.travelStyle === 'Adventurous') {
     return budgetRanges.slice(0, 2);
-  } else if (preferences?.travelStyle?.type === 'luxury') {
+  } else if (preferences?.travelStyle === 'Relaxed') {
     return budgetRanges.slice(2);
   }
 

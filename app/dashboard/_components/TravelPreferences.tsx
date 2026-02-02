@@ -94,8 +94,8 @@ function TravelPreferences({ preferences, onUpdate }: any) {
                                     key={type}
                                     onClick={() => handleUpdate('travelCompanions', type)}
                                     className={`py-2 px-3 text-sm rounded-xl border flex items-center justify-center gap-2 ${data.travelCompanions === type
-                                            ? 'bg-blue-50 border-blue-200 text-blue-700 font-semibold'
-                                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                        ? 'bg-blue-50 border-blue-200 text-blue-700 font-semibold'
+                                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                                         }`}
                                 >
                                     {type}
@@ -167,7 +167,7 @@ function TravelPreferences({ preferences, onUpdate }: any) {
                     <div className="space-y-4">
                         <div className="flex justify-between">
                             <Label className="flex items-center gap-2"><Wallet className="w-4 h-4 text-gray-400" /> Average Trip Budget</Label>
-                            <span className="font-bold text-blue-600">${data.budget.toLocaleString()}</span>
+                            <span className="font-bold text-blue-600">₹{data.budget.toLocaleString()}</span>
                         </div>
                         <Slider
                             value={[data.budget]}
@@ -181,8 +181,8 @@ function TravelPreferences({ preferences, onUpdate }: any) {
                             className="py-4"
                         />
                         <div className="flex justify-between text-xs text-gray-400">
-                            <span>$500</span>
-                            <span>$10,000+</span>
+                            <span>₹500</span>
+                            <span>₹10,000+</span>
                         </div>
                     </div>
 
@@ -194,8 +194,8 @@ function TravelPreferences({ preferences, onUpdate }: any) {
                                     key={style}
                                     onClick={() => handleNestedUpdate('travelStyle', 'type', style)}
                                     className={`py-2 px-3 text-sm rounded-xl border ${data.travelStyle.type === style
-                                            ? 'bg-blue-600 border-blue-600 text-white'
-                                            : 'bg-white border-gray-200 text-gray-600'
+                                        ? 'bg-blue-600 border-blue-600 text-white'
+                                        : 'bg-white border-gray-200 text-gray-600'
                                         }`}
                                 >
                                     {style}

@@ -14,6 +14,7 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as admin from "../admin.js";
+import type * as bookings from "../bookings.js";
 import type * as documents from "../documents.js";
 import type * as group_trips from "../group_trips.js";
 import type * as itineraries from "../itineraries.js";
@@ -27,6 +28,9 @@ import type * as price_alerts from "../price_alerts.js";
 import type * as saved_flights from "../saved_flights.js";
 import type * as tripDetail from "../tripDetail.js";
 import type * as user from "../user.js";
+import type * as userPreferences from "../userPreferences.js";
+import type * as userPreferencesCleanup from "../userPreferencesCleanup.js";
+import type * as userStats from "../userStats.js";
 import type * as user_dashboard from "../user_dashboard.js";
 
 /**
@@ -39,6 +43,7 @@ import type * as user_dashboard from "../user_dashboard.js";
  */
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
+  bookings: typeof bookings;
   documents: typeof documents;
   group_trips: typeof group_trips;
   itineraries: typeof itineraries;
@@ -52,6 +57,9 @@ declare const fullApi: ApiFromModules<{
   saved_flights: typeof saved_flights;
   tripDetail: typeof tripDetail;
   user: typeof user;
+  userPreferences: typeof userPreferences;
+  userPreferencesCleanup: typeof userPreferencesCleanup;
+  userStats: typeof userStats;
   user_dashboard: typeof user_dashboard;
 }>;
 export declare const api: FilterApi<

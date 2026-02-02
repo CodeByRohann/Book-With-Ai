@@ -5,7 +5,7 @@ import { ExternalLink } from 'lucide-react';
 import React, { useEffect, useState } from 'react'
 import SmartMap from '@/app/create-new-trip/_components/SmartMap';
 import Itinerary from '@/app/create-new-trip/_components/Itinerary';
-import { Trip } from '@/app/my-trips/page';
+import { Trip } from '@/utils/custom_types';
 import { useTripDetail, useUserDetail } from '@/app/provider';
 import { api } from '@/convex/_generated/api';
 import { useConvex } from 'convex/react';
@@ -17,8 +17,9 @@ function ViewTrip() {
     const { userDetail, setUserDetail } = useUserDetail();
     const convex = useConvex();
     const [tripData, setTripData] = useState<Trip>();
-    //@ts-ignore
-    const { tripDetailInfo, setTripDetailInfo } = useTripDetail();
+    // Author: Sanket - Type-safe context usage
+    const tripContext = useTripDetail();
+    const { tripDetailInfo, setTripDetailInfo } = tripContext || { tripDetailInfo: null, setTripDetailInfo: () => { } };
     useEffect(() => {
         if (userDetail) {
             GetTrip();

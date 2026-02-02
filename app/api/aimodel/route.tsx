@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { generateGeminiChat } from "@/utils/gemini";
+import { generateOpenAIChat } from "@/utils/openaiChat";
 import { aj } from "@/utils/arcjet";
 import { searchTravelInfo } from "@/utils/serpapi";
+import { extractFlightDetails, isFlightSearchIntent, hasRequiredFlightDetails } from "@/utils/nlpExtractor";
 
 
 
@@ -55,6 +56,7 @@ Example responses:
 const FINAL_PROMPT = `Generate Travel Plan fwith give details, give me Hotels options list with HotelName, 
 Hotel address, Price, hotel image url, geo coordinates, rating, descriptions and  suggest itinerary with placeName, Place Details, Place Image Url,
  Geo Coordinates,Place address, ticket Pricing, Time travel each of the location , with each day plan with best time to visit in JSON format.
+ All prices must be in Indian Rupees (₹).
  Output Schema:
  {
   "trip_plan": {
@@ -157,43 +159,71 @@ export async function POST(req: NextRequest) {
       const isFlightSearch = userQuery.match(/flight|fly|plane|airfare|ticket/i) || contextIsFlight;
       const isHotelBooking = userQuery.match(/book hotel|find hotel|hotel in|need accommodation|where to stay|hotels? in/i);
 
-      // --- FLIGHT SEARCH FLOW ---
+      // --- FLIGHT SEARCH FLOW (Enhanced with NLP) ---
       if (isFlightSearch) {
-        // ... (Logic from previous catch block) ...
-        // Re-implementing the extraction logic cleanly
-        let from = null, to = null, date = null;
-        let lastQuestion = null;
+        // Author: Sanket - Enhanced flight search with GPT-4o mini NLP extraction
+        console.log('🛫 Flight search detected, using NLP extraction');
 
-        for (const msg of messages) {
-          const content = msg.content.toLowerCase();
-          if (msg.role === 'assistant') {
-            if (content.match(/flying from|departure city/)) lastQuestion = 'from';
-            else if (content.match(/fly to|where to|destination/)) lastQuestion = 'to';
-            else if (content.match(/when|date|traveling/)) lastQuestion = 'date';
-            else lastQuestion = null;
-          } else if (msg.role === 'user') {
-            const fromMatch = content.match(/(?:from)\s+([a-z\s]+)(?:to|$)/i);
-            if (fromMatch) { from = fromMatch[1].trim().replace(/\b(to)\b/gi, '').trim(); lastQuestion = null; }
+        try {
+          // Use NLP to extract flight details from the latest user message
+          const latestUserMessage = messages.filter((m: any) => m.role === 'user').pop()?.content || '';
+          const extracted = await extractFlightDetails(latestUserMessage);
 
-            const toMatch = content.match(/(?:to|fly to|going to)\s+([a-z\s]+)(?:from|$)/i);
-            if (toMatch) { to = toMatch[1].trim().replace(/\b(from)\b/gi, '').trim(); lastQuestion = null; }
+          console.log('📊 NLP Extracted:', extracted);
 
-            const dateMatch = content.match(/(\d{4}-\d{2}-\d{2}|\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*|today|tomorrow|next\s+[a-z]+)/i);
-            if (dateMatch) { date = dateMatch[0]; lastQuestion = null; }
-
-            const cleanContent = content.replace(/\b(to|from|go|fly|flight|please|i|want|will|be)\b/gi, '').trim();
-            if (lastQuestion === 'from' && !from && cleanContent.length > 2) from = cleanContent;
-            else if (lastQuestion === 'to' && !to && cleanContent.length > 2) to = cleanContent;
-            else if (lastQuestion === 'date' && !date && cleanContent.length > 2) date = cleanContent;
+          // Check if we have all required details
+          if (hasRequiredFlightDetails(extracted)) {
+            // We have everything, trigger flight search
+            return NextResponse.json({
+              resp: `Searching for flights from ${extracted.from} to ${extracted.to}... ✈️`,
+              ui: 'flightSearch',
+              intent: 'flight',
+              flightDetails: extracted
+            });
           }
+
+          // Ask for missing information
+          if (!extracted.from) {
+            return NextResponse.json({
+              resp: `I can find flights for you! ✈️\n\nWhere will you be flying from?`,
+              ui: null,
+              intent: 'flight'
+            });
+          }
+
+          if (!extracted.to) {
+            return NextResponse.json({
+              resp: `Got it, flying from ${extracted.from}. Where would you like to fly to?`,
+              ui: null,
+              intent: 'flight'
+            });
+          }
+
+          if (!extracted.date) {
+            return NextResponse.json({
+              resp: `When are you planning to travel from ${extracted.from} to ${extracted.to}?`,
+              ui: null,
+              intent: 'flight'
+            });
+          }
+
+          // Fallback - should not reach here
+          return NextResponse.json({
+            resp: `Searching for flights... ✈️`,
+            ui: 'flightSearch',
+            intent: 'flight',
+            flightDetails: extracted
+          });
+
+        } catch (nlpError) {
+          console.error('❌ NLP extraction failed, using fallback:', nlpError);
+          // Fallback to basic regex extraction
+          return NextResponse.json({
+            resp: `I can help you find flights! Please tell me:\n\n1. Where are you flying from?\n2. Where are you flying to?\n3. When do you want to travel?`,
+            ui: null,
+            intent: 'flight'
+          });
         }
-
-        // Immediate Returns
-        if (!from) return NextResponse.json({ resp: `I can find flights for you! ✈️\n\nWhere will you be flying from?`, ui: null, intent: 'flight' });
-        if (!to) return NextResponse.json({ resp: `Got it. Where would you like to fly to?`, ui: null, intent: 'flight' });
-        if (!date && !conversationHistory.match(/(\d{4}-\d{2}-\d{2}|today|tomorrow|next)/i)) return NextResponse.json({ resp: `When are you planning to travel?`, ui: null, intent: 'flight' });
-
-        return NextResponse.json({ resp: `Searching for fastest flights... ✈️`, ui: 'flightSearch', intent: 'flight' });
       }
 
       // --- HOTEL BOOKING FLOW ---
@@ -247,8 +277,8 @@ export async function POST(req: NextRequest) {
   try {
     let enhancedPrompt = isFinal ? FINAL_PROMPT : PROMPT;
 
-    let response = await generateGeminiChat(messages, enhancedPrompt);
-    console.log('✅ Gemini Response received, length:', response.length);
+    let response = await generateOpenAIChat(messages, enhancedPrompt);
+    console.log('✅ OpenAI Response received, length:', response.length);
 
     // ... (Existing Parsing Logic) ...
     try {
@@ -273,11 +303,11 @@ export async function POST(req: NextRequest) {
       intent: 'trip'
     });
 
-  } catch (geminiError: any) {
+  } catch (openaiError: any) {
     // Fallback to error message, OR to the state machine if we haven't tried it yet (but we did try it first now)
-    console.error('Gemini Failed', geminiError);
+    console.error('OpenAI Failed', openaiError);
     return NextResponse.json({
-      resp: geminiError?.message || "I'm having trouble connecting. Please try again.",
+      resp: openaiError?.message || "I'm having trouble connecting. Please try again.",
       ui: 'error',
       intent: 'error'
     });

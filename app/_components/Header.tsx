@@ -1,6 +1,7 @@
 "use client"
 import { Button } from '@/components/ui/button'
-import { SignInButton, UserButton, useUser } from '@clerk/nextjs'
+import { SignInButton, useUser } from '@clerk/nextjs'
+import CustomUserButton from '@/components/ui/custom-user-button'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -38,9 +39,9 @@ const menuOptions = [
 ]
 
 function Header() {
-
-    //@ts-ignore
-    const { tripDetailInfo, setTripDetailInfo } = useTripDetail();
+    // Author: Sanket - Proper type-safe context usage
+    const tripContext = useTripDetail();
+    const { tripDetailInfo, setTripDetailInfo } = tripContext || { tripDetailInfo: null, setTripDetailInfo: () => { } };
 
     const { user } = useUser();
     const path = usePathname();
@@ -88,7 +89,7 @@ function Header() {
                                 </Link>
                             </div> :
                             <div className='flex items-center gap-3 pl-2'>
-                                <UserButton afterSignOutUrl="/" />
+                                <CustomUserButton />
                             </div>
                         }
                     </div>

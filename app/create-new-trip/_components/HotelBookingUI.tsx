@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { MapPin, Star, DollarSign, Phone, ExternalLink } from 'lucide-react';
+import { MapPin, Star, Phone, ExternalLink } from 'lucide-react';
 
 interface Hotel {
   name: string;

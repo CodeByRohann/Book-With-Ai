@@ -136,7 +136,7 @@ export const SmartSuggestions: React.FC<SmartSuggestionsProps> = ({
                 <div>
                   <p className="font-medium">${smartBudget.toLocaleString()}</p>
                   <p className="text-xs text-muted-foreground">
-                    Based on your {preferences?.travelStyle?.type} style
+                    Based on your {preferences?.travelStyle} style
                   </p>
                 </div>
                 <Button
@@ -195,12 +195,12 @@ export const SmartSuggestions: React.FC<SmartSuggestionsProps> = ({
                 <Target className="h-4 w-4 text-primary" />
                 <div className="flex-1">
                   <p className="text-sm font-medium">
-                    Your travel style: <span className="capitalize">{preferences.travelStyle.type}</span>
+                    Your travel style: <span className="capitalize">{preferences.travelStyle}</span>
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {preferences.travelStyle.type === 'luxury' && 'Focusing on premium experiences and comfort'}
-                    {preferences.travelStyle.type === 'budget' && 'Optimizing for value and affordable adventures'}
-                    {preferences.travelStyle.type === 'balanced' && 'Perfect balance of comfort and value'}
+                    {preferences.travelStyle === 'Relaxed' && 'Focusing on premium experiences and comfort'}
+                    {preferences.travelStyle === 'Adventurous' && 'Optimizing for value and affordable adventures'}
+                    {preferences.travelStyle === 'Balanced' && 'Perfect balance of comfort and value'}
                   </p>
                 </div>
               </div>

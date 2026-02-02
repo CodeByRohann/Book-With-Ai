@@ -7,6 +7,7 @@ import { useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { useUser } from '@clerk/nextjs'
 import { Loader2, Upload, File as FileIcon } from 'lucide-react'
+import { handleError, handleSuccess } from '@/lib/error-handler'
 
 interface UploadDocumentModalProps {
     children?: React.ReactNode;
@@ -63,12 +64,13 @@ function UploadDocumentModal({ children }: UploadDocumentModalProps) {
                 isEncrypted: true,
             });
 
+            handleSuccess('Document uploaded successfully!');
             setOpen(false);
             setTitle('');
             setFile(null);
             setType('passport');
         } catch (error) {
-            console.error("Failed to upload document:", error);
+            handleError(error, 'Failed to upload document. Please try again.');
         } finally {
             setLoading(false);
         }

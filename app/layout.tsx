@@ -5,6 +5,7 @@ import Provider from "./provider";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 
 export const metadata: Metadata = {
@@ -84,11 +85,14 @@ export default function RootLayout({
           className={outfit.className}
           suppressHydrationWarning
         >
-          <ThemeProvider>
-            <ConvexClientProvider>
-              {children}
-            </ConvexClientProvider>
-          </ThemeProvider>
+          {/* Author: Sanket - Error boundary prevents app crashes */}
+          <ErrorBoundary>
+            <ThemeProvider>
+              <ConvexClientProvider>
+                {children}
+              </ConvexClientProvider>
+            </ThemeProvider>
+          </ErrorBoundary>
         </body>
       </html>
     </ClerkProvider>
