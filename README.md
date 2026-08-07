@@ -235,9 +235,9 @@ This project is licensed under the MIT License.
 
 ## 👨‍💻 Developer
 
-**Sanket Mane**
-- 📧 Email: contactsanket1@gmail.com
-- 📱 Phone: +91 7310013030
+**Rohan Desai**
+- 📧 Email: rohandesai568@gmail.com
+- 📱 Phone: +91 7020428986
 - 💼 GitHub: [@georgeadriel07](https://github.com/georgeadriel07)
 
 ## 🙏 Acknowledgments
@@ -259,6 +259,6 @@ This project is licensed under the MIT License.
 
 ---
 
-**Built with ❤️ by Sanket Mane**
+**Built with ❤️ by rohan**
 
 *Making travel planning intelligent and effortless*
